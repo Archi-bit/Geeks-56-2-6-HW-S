@@ -7,9 +7,9 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from rest_framework import permissions
-
-from .models import Category, Product, Review
-from .serializers import (
+from common.validators import validate_user_age_from_token
+from product.models import Category, Product, Review
+from product.serializers import (
     CategorySerializer,
     ProductSerializer,
     ReviewSerializer,
@@ -36,18 +36,39 @@ class CustomPagination(PageNumberPagination):
         return PAGE_SIZE
 
 
-class CategoryListCreateAPIView(ListCreateAPIView):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
+from common.validators import validate_user_age_from_token  # 👈 импорт
+
+class ProductListCreateAPIView(ListCreateAPIView):
+    queryset = Product.objects.select_related('category').all()
+    serializer_class = ProductSerializer
     pagination_class = CustomPagination
+    permission_classes = [IsOwner | IsAnonymous | IsModerator]
 
     def post(self, request, *args, **kwargs):
-        serializer = CategoryValidateSerializer(data=request.data)
+        # Проверка возраста
+        validate_user_age_from_token(request)  # 👈 вот здесь
+
+        email = request.auth.get("email")
+        print(f"email: {email}")
+        serializer = ProductValidateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        category = Category.objects.create(**serializer.validated_data)
-        return Response(data=CategorySerializer(category).data,
+        title = serializer.validated_data.get('title')
+        description = serializer.validated_data.get('description')
+        price = serializer.validated_data.get('price')
+        category = serializer.validated_data.get('category')
+
+        product = Product.objects.create(
+            title=title,
+            description=description,
+            price=price,
+            category=category,
+            owner_id=request.auth.get("user_id")
+        )
+
+        return Response(data=ProductSerializer(product).data,
                         status=status.HTTP_201_CREATED)
+
 
 class CategoryDetailAPIView(RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
@@ -65,13 +86,15 @@ class CategoryDetailAPIView(RetrieveUpdateDestroyAPIView):
         return Response(data=CategorySerializer(instance).data)
 
 
-class ProductListCreateAPIView(ListCreateAPIView):
+class CategoryListCreateAPIView(ListCreateAPIView):
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
     pagination_class = CustomPagination
     permission_classes =[IsOwner | IsAnonymous | IsModerator]
 
     def post(self, request, *args, **kwargs):
+        email = request.auth.get("email")
+        print(f"email: {email}")
         serializer = ProductValidateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -87,7 +110,7 @@ class ProductListCreateAPIView(ListCreateAPIView):
             description=description,
             price=price,
             category=category,
-            owner=request.user
+            owner_id=request.auth.get("user_id")
         )
 
         return Response(data=ProductSerializer(product).data,
