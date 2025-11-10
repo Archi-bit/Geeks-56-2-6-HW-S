@@ -76,3 +76,6 @@ class ConfirmationSerializer(serializers.Serializer):
             raise ValidationError('Неверный код подтверждения!')
 
         return attrs
+
+class OauthCodeSerializer(serializers.Serializer):
+    code = serializers.CharField()

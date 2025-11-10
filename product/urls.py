@@ -4,7 +4,6 @@ from .views import (
     CategoryDetailAPIView,
     ProductListCreateAPIView,
     ProductDetailAPIView,
-    ReviewViewSet,
     ProductWithReviewsAPIView
 )
 
