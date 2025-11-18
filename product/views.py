@@ -1,4 +1,6 @@
 from collections import OrderedDict
+from http.client import responses
+
 from django.db import transaction
 from rest_framework.response import Response
 from rest_framework import status
@@ -19,6 +21,8 @@ from product.serializers import (
     ReviewValidateSerializer
 )
 from common.permissions import IsOwner, IsAnonymous, CanEditWithin15Minutes, IsModerator
+from django.core.cache import cache
+from common.validators import validate_user_age_from_token
 
 PAGE_SIZE = 5
 
@@ -36,8 +40,6 @@ class CustomPagination(PageNumberPagination):
         return PAGE_SIZE
 
 
-from common.validators import validate_user_age_from_token  # 👈 импорт
-
 class ProductListCreateAPIView(ListCreateAPIView):
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
@@ -45,8 +47,7 @@ class ProductListCreateAPIView(ListCreateAPIView):
     permission_classes = [IsOwner | IsAnonymous | IsModerator]
 
     def post(self, request, *args, **kwargs):
-        # Проверка возраста
-        validate_user_age_from_token(request)  # 👈 вот здесь
+        validate_user_age_from_token(request)
 
         email = request.auth.get("email")
         print(f"email: {email}")
@@ -68,6 +69,18 @@ class ProductListCreateAPIView(ListCreateAPIView):
 
         return Response(data=ProductSerializer(product).data,
                         status=status.HTTP_201_CREATED)
+
+
+    def get(self, request, *args, **kwargs):
+        cached_data = cache.get("product_list")
+        if cached_data:
+            print("Redis")
+            return Response(data=cached_data, status=status.HTTP_200_OK)
+        response = super().get(self, request, *args, **kwargs)
+        print("Postgres")
+        if response.data.get("total", 0) > 0:
+            cache.set("product_list", response.data, timeout=300)
+        return response
 
 
 class CategoryDetailAPIView(RetrieveUpdateDestroyAPIView):

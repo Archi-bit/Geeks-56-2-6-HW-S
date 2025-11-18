@@ -4,7 +4,7 @@ from django.db.models.fields import CharField
 from users.managers import CustomUserManager
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
-    email = models. EmailField(unique=True)
+    email = models.EmailField(unique=True)
     phone_number = CharField(max_length=20, blank=True, null=True)
     first_name = models.CharField(max_length=150, blank=True, null=True)
     last_name = models.CharField(max_length=150, blank=True, null=True)
@@ -25,12 +25,4 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ["phone_number"]
 
     def __str__(self):
-            return self.email or ""
-
-class ConfirmationCode(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='confirmation_code')
-    code = models.CharField(max_length=6)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Код подтверждения для {self.user.email}"
+        return self.email or ""

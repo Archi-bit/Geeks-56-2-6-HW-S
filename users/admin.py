@@ -1,5 +1,5 @@
 from django.contrib import admin
-from users.models import CustomUser, ConfirmationCode
+from users.models import CustomUser
 from django.contrib.auth.admin import UserAdmin
 
 
@@ -37,9 +37,3 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
-
-
-@admin.register(ConfirmationCode)
-class ConfirmationCodeAdmin(admin.ModelAdmin):
-    list_display = ("user", "code", "created_at")
-    search_fields = ("user__email", "code")

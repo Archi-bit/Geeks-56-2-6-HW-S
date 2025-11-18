@@ -1,26 +1,26 @@
 from django.db import transaction
-from rest_framework.views import APIView
+from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
 from rest_framework import status
-# from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
-from rest_framework.generics import CreateAPIView
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .serializers import (
     RegisterValidateSerializer,
     AuthValidateSerializer,
-    ConfirmationSerializer
+    ConfirmationSerializer,
 )
-from users.models import ConfirmationCode, CustomUser
+from users.models import CustomUser
 import random
 import string
-from rest_framework_simplejwt.views import TokenObtainPairView
+
 from users.serializers import CustomTokenObtainPairSerializer
+
+from common.redis import set_confirmation_code, check_and_delete_confirmation_code
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
-
 
 class AuthorizationAPIView(CreateAPIView):
     serializer_class = AuthValidateSerializer
@@ -46,7 +46,6 @@ class AuthorizationAPIView(CreateAPIView):
             data={'error': 'User credentials are wrong!'}
         )
 
-
 class RegistrationAPIView(CreateAPIView):
     serializer_class = RegisterValidateSerializer
 
@@ -57,7 +56,6 @@ class RegistrationAPIView(CreateAPIView):
         email = serializer.validated_data['email']
         password = serializer.validated_data['password']
 
-        # Use transaction to ensure data consistency
         with transaction.atomic():
             user = CustomUser.objects.create_user(
                 email=email,
@@ -65,13 +63,9 @@ class RegistrationAPIView(CreateAPIView):
                 is_active=False
             )
 
-            # Create a random 6-digit code
             code = ''.join(random.choices(string.digits, k=6))
 
-            confirmation_code = ConfirmationCode.objects.create(
-                user=user,
-                code=code
-            )
+            set_confirmation_code(user.id, code)
 
         return Response(
             status=status.HTTP_201_CREATED,
@@ -81,7 +75,6 @@ class RegistrationAPIView(CreateAPIView):
             }
         )
 
-
 class ConfirmUserAPIView(CreateAPIView):
     serializer_class = ConfirmationSerializer
 
@@ -90,15 +83,24 @@ class ConfirmUserAPIView(CreateAPIView):
         serializer.is_valid(raise_exception=True)
 
         user_id = serializer.validated_data['user_id']
+        provided_code = serializer.validated_data['code']
+
+        result = check_and_delete_confirmation_code(user_id, provided_code)
+        if result == -1:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Код подтверждения не найден или истёк!'})
+        if result == 0:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Неверный код подтверждения!'})
 
         with transaction.atomic():
-            user = CustomUser.objects.get(id=user_id)
+            try:
+                user = CustomUser.objects.get(id=user_id)
+            except CustomUser.DoesNotExist:
+                return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'Пользователь не найден'})
+
             user.is_active = True
             user.save()
 
             token, _ = Token.objects.get_or_create(user=user)
-
-            ConfirmationCode.objects.filter(user=user).delete()
 
         return Response(
             status=status.HTTP_200_OK,
