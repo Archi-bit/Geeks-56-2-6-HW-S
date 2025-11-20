@@ -5,18 +5,16 @@ from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.views import TokenObtainPairView
-
 from .serializers import (
     RegisterValidateSerializer,
     AuthValidateSerializer,
     ConfirmationSerializer,
 )
+from users.tasks import send_otp_email
 from users.models import CustomUser
 import random
 import string
-
 from users.serializers import CustomTokenObtainPairSerializer
-
 from common.redis import set_confirmation_code, check_and_delete_confirmation_code
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -66,6 +64,8 @@ class RegistrationAPIView(CreateAPIView):
             code = ''.join(random.choices(string.digits, k=6))
 
             set_confirmation_code(user.id, code)
+
+        send_otp_email.delay(email, code)
 
         return Response(
             status=status.HTTP_201_CREATED,

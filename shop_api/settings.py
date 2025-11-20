@@ -15,11 +15,12 @@ from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from drf_yasg.app_settings import SWAGGER_DEFAULTS
+from decouple import config
 
 load_dotenv()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True if os.environ.get('DEBUG') == 'on' else False
+DEBUG = True if config('DEBUG') == 'on' else False
 
 from django.conf.global_settings import AUTH_USER_MODEL, CACHES
 
@@ -31,7 +32,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET')
+SECRET_KEY = config("SECRET")
 
 
 ALLOWED_HOSTS = []
@@ -115,11 +116,11 @@ WSGI_APPLICATION = 'shop_api.wsgi.application'
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': os.environ.get('DB_NAME'),
-#         'USER': os.environ.get('DB_USER'),
-#         'PASSWORD': os.environ.get('DB_PASSWORD'),
-#         'HOST': os.environ.get('DB_HOST'),
-#         'PORT': os.environ.get('DB_PORT'),
+#         'NAME': config('DB_NAME'),
+#         'USER': config('DB_USER'),
+#         'PASSWORD': config('DB_PASSWORD'),
+#         'HOST': config('DB_HOST'),
+#         'PORT': config('DB_PORT'),
 #     }
 # }
 
@@ -205,3 +206,12 @@ CACHES = {
         }
     }
 }
+
+CELERY_BROKER_URL="redis://127.0.0.1:6379/2"
+CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/2"
+
+EMAIL_USE_TLS = True
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
